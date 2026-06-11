@@ -1,32 +1,39 @@
 import dotenv from 'dotenv';
-// CRITICAL: dotenv ko sabse pehle config karna hai taaki baki modules ko env variables mil sakein
 dotenv.config();
 
 import express from 'express';
 import cors from 'cors';
+import { createServer } from 'http'; // Native Node server connector
 import connectDB from './config/db.js';
-import redisClient from './config/redis.js'; // Redis client ko inject kiya OTP store ke liye
-import authRoutes from './routes/authRoutes.js'; // Auth endpoints ke routes import kiye
+import cacheEngine from './config/redis.js'; 
+import { initSocket } from './config/socket.js'; // Socket setup import kiya
 
-// Express app initialize karo
+import authRoutes from './routes/authRoutes.js'; 
+import workerRoutes from './routes/workerRoutes.js';
+import bookingRoutes from './routes/bookingRoutes.js';
+
 const app = express();
+const httpServer = createServer(app); // Upgrading express into native HTTP layer
 
 // Middlewares
 app.use(cors());
-app.use(express.json()); // Taaki hum incoming JSON payload data read kar sakein
+app.use(express.json());
 
-// Connect to MongoDB Database
+// Initialize Databases
 connectDB();
+initSocket(httpServer); // Mounting Socket.io server layer over HTTP
 
-// API Routes Mapping (SRS Section 9.1)
+// API Routes Mapping
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/workers', workerRoutes);
+app.use('/api/v1/bookings', bookingRoutes);
 
-// Basic Test Route
 app.get('/', (req, res) => {
-  res.send('Sahayog Sarthi API is running smoothly...');
+  res.send('Sahayog Sarthi API is running smoothly with real-time sockets...');
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`📡 Server listening on port ${PORT}`);
+// CRITICAL FIX: Ab app.listen ki jagah httpServer.listen use karenge taaki sockets active rahein!
+httpServer.listen(PORT, () => {
+  console.log(`📡 Real-time HTTP & Socket Server listening on port ${PORT}`);
 });
